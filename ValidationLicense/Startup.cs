@@ -88,6 +88,10 @@ namespace ValidationLicense
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers(); // This maps the controller actions to routes
+
+            endpoints.MapControllerRoute(
+            name: "default",
+            pattern: "api/{controller}/{action}/{id?}");
             });
         }
     }
