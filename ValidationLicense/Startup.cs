@@ -1,55 +1,74 @@
-using LicenseValidationApi;  // Add the namespace for DatabaseService
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using System;
+using System.Data;
+using System.Data.SqlClient;
+using LicenseValidationApi;  // Add the namespace for DatabaseService
 
 namespace ValidationLicense
 {
     public class Startup
     {
+        public IConfiguration Configuration { get; }
+
         public Startup(IConfiguration configuration)
         {
             var connection = Configuration.GetConnectionString("Dbconnection");
             var value = configuration.GetSection("Connection:Dbconnection").Value;
             Configuration = configuration;
-        }
 
-        public IConfiguration Configuration { get; }
+        }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // Configure CORS (Allow all origins, methods, and headers)
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", builder =>
+                {
+                    builder.AllowAnyOrigin()
+                           .AllowAnyMethod()
+                           .AllowAnyHeader();
+                });
+            });
+
+            // Register the IDbConnection with the connection string from appsettings.json
+            services.AddSingleton<IDbConnection>(sp =>
+            {
+                var connectionString = Configuration.GetConnectionString("Dbconnection");
+                return new SqlConnection(connectionString);
+            });
+
             // Register the DatabaseService as a Singleton
             services.AddSingleton<DatabaseService>();
 
-            // Add the controllers (API controllers)
+            // Add other services
             services.AddControllers();
 
             // Add Swagger for API documentation
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "License Validation API", Version = "v1" });
-
-                // Optionally, you can add XML comments for more descriptive API documentation (if you have XML comments in your code)
-                // var xmlFile = $"{AppDomain.CurrentDomain.FriendlyName}.xml";
-                // var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-                // c.IncludeXmlComments(xmlPath);
             });
 
-            // Add Database connection string configuration (Optional if you want to use the connection string in multiple places)
+            // Add the configuration for later access (optional)
             services.AddSingleton<IConfiguration>(Configuration);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            app.UseCors("AllowAll"); // Enable CORS
+
+            // Other middleware (Swagger, Routing, etc.)
+            app.UseRouting();
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -62,10 +81,7 @@ namespace ValidationLicense
             // Redirect HTTP requests to HTTPS
             app.UseHttpsRedirection();
 
-            // Use routing to map the incoming HTTP requests to controllers
-            app.UseRouting();
-
-            // Add authorization (if necessary) - Add authentication if required
+            // Add authorization middleware if necessary
             app.UseAuthorization();
 
             // Map controller routes to the HTTP request pipeline
